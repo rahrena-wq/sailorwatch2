@@ -303,12 +303,12 @@ main{max-width:var(--max);margin:0 auto;padding:var(--gap);display:flex;flex-dir
 
 // ── GIST CONFIG ──
 // Replace YOUR_TOKEN_HERE with your GitHub personal access token (gist scope only)
-const GITHUB_TOKEN = 'YOUR_TOKEN_HERE';
+const GITHUB_TOKEN = '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';
 const GIST_ID      = '3cac51cf9682f10785d911c5f212c7fc';
 const GIST_FILE    = 'sailorwatch_location.json';
 
 async function pushToGist(lat, lon, city) {
-  if (!GITHUB_TOKEN || GITHUB_TOKEN === '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') {
+  if (!GITHUB_TOKEN || GITHUB_TOKEN === 'YOUR_TOKEN_HERE') {
     ok('Location saved locally. Add your GitHub token to sync to watch.');
     return;
   }
@@ -423,9 +423,13 @@ async function fetchWeather(){
   // Use current_weather.temperature — this is the actual current model reading
   // NOT the hourly slot which may lag by up to 59 minutes
   const tNow=Math.round(cw.temperature);
-  const tHi=Math.round(d.daily.temperature_2m_max[0]);
-  const tLo=Math.round(d.daily.temperature_2m_min[0]);
-  const tFeels=Math.round(d.hourly.apparent_temperature[hIdx]||tNow);
+  // Match daily array to TODAY's local date (not always index [0] near midnight)
+  const todayStr=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}-${String(new Date().getDate()).padStart(2,'0')}`;
+  const dIdx=d.daily.time.findIndex(t=>t===todayStr);
+  const dayIdx=dIdx>=0?dIdx:0;
+  const tHi=Math.round(d.daily.temperature_2m_max[dayIdx]);
+  const tLo=Math.round(d.daily.temperature_2m_min[dayIdx]);
+  const tFeels=Math.round((d.hourly.apparent_temperature&&d.hourly.apparent_temperature[hIdx])||tNow);
   const rain=d.hourly.precipitation_probability[hIdx]||0;
   const hum=d.hourly.relativehumidity_2m[hIdx]||0;
   const windConv=S.windUnit==='kts'?0.868976:S.windUnit==='kph'?1.60934:1;
