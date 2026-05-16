@@ -303,12 +303,12 @@ main{max-width:var(--max);margin:0 auto;padding:var(--gap);display:flex;flex-dir
 
 // ── GIST CONFIG ──
 // Replace YOUR_TOKEN_HERE with your GitHub personal access token (gist scope only)
-const GITHUB_TOKEN = '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';
+const GITHUB_TOKEN = 'YOUR_TOKEN_HERE';
 const GIST_ID      = '3cac51cf9682f10785d911c5f212c7fc';
 const GIST_FILE    = 'sailorwatch_location.json';
 
 async function pushToGist(lat, lon, city) {
-  if (!GITHUB_TOKEN || GITHUB_TOKEN === 'YOUR_TOKEN_HERE') {
+  if (!GITHUB_TOKEN || GITHUB_TOKEN === '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') {
     ok('Location saved locally. Add your GitHub token to sync to watch.');
     return;
   }
@@ -398,7 +398,7 @@ async function fetchAll(){
     await Promise.all([fetchWeather(),fetchSunTide()]);
     S.lastSync=Date.now();save();
     setStatus('Up to date','ok');
-    document.getElementById('lastSync').textContent='Last synced '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('lastSync').textContent='Last synced '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · Source: Open-Meteo (NWS/ECMWF)';
     document.getElementById('wBadge').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     renderCharts();
   }catch(e){setStatus('Fetch failed','err');err('Could not load: '+e.message);}
@@ -409,8 +409,9 @@ async function fetchWeather(){
   const wu=S.windUnit==='kph'?'kmh':S.windUnit==='kts'?'kn':'mph';
   const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
   const url=`https://api.open-meteo.com/v1/forecast?latitude=${S.lat}&longitude=${S.lon}`+
-    `&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation_probability,relativehumidity_2m`+
-    `&daily=temperature_2m_max,temperature_2m_min&current_weather=true`+
+    `&hourly=temperature_2m,apparent_temperature,windspeed_10m,winddirection_10m,precipitation_probability,relativehumidity_2m`+
+    `&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min`+
+    `&current_weather=true&current_weather_units=true`+
     `&temperature_unit=${tu}&windspeed_unit=${wu}&timezone=${encodeURIComponent(tz)}&forecast_days=2`;
   const r=await fetch(url);const d=await r.json();
   const hIdx=findHour(d.hourly.time,new Date());
@@ -419,9 +420,12 @@ async function fetchWeather(){
   S.temps8=arr8(d.hourly.temperature_2m,hIdx);
   S.rain8 =arr8(d.hourly.precipitation_probability,hIdx);
   const cw=d.current_weather;
-  const tNow=Math.round(d.hourly.temperature_2m[hIdx]);
+  // Use current_weather.temperature — this is the actual current model reading
+  // NOT the hourly slot which may lag by up to 59 minutes
+  const tNow=Math.round(cw.temperature);
   const tHi=Math.round(d.daily.temperature_2m_max[0]);
   const tLo=Math.round(d.daily.temperature_2m_min[0]);
+  const tFeels=Math.round(d.hourly.apparent_temperature[hIdx]||tNow);
   const rain=d.hourly.precipitation_probability[hIdx]||0;
   const hum=d.hourly.relativehumidity_2m[hIdx]||0;
   const windConv=S.windUnit==='kts'?0.868976:S.windUnit==='kph'?1.60934:1;
@@ -429,7 +433,7 @@ async function fetchWeather(){
   document.getElementById('dWind').textContent=dispWind;
   document.getElementById('dWindDir').textContent=deg2card(cw.winddirection)+' · '+S.windUnit;
   document.getElementById('dTemp').textContent=`${tNow}°${S.tempUnit}`;
-  document.getElementById('dTempHL').textContent=`Hi ${tHi}° · Lo ${tLo}°`;
+  document.getElementById('dTempHL').textContent=`Hi ${tHi}° · Lo ${tLo}° · Feels ${tFeels}°`;
   document.getElementById('dRain').textContent=`${rain}%`;
   document.getElementById('dHum').textContent=`${hum}%`;
   S.payload={windSpeed:Math.round(cw.windspeed),windDir:deg2card(cw.winddirection),
@@ -532,7 +536,25 @@ function copyPayload(){
 
 // ── HELPERS ──
 function arr8(arr,start){return Array.from({length:8},(_,i)=>Math.round(arr[start+i]||0));}
-function findHour(times,now){const h=now.toISOString().slice(0,13);const i=times.findIndex(t=>t.startsWith(h));return i>=0?i:0;}
+function findHour(times,now){
+  // Open-Meteo times are in local timezone (e.g. "2026-05-15T14:00")
+  // Match using local date+hour, not UTC
+  const yr=now.getFullYear();
+  const mo=String(now.getMonth()+1).padStart(2,'0');
+  const dy=String(now.getDate()).padStart(2,'0');
+  const hr=String(now.getHours()).padStart(2,'0');
+  const localStr=`${yr}-${mo}-${dy}T${hr}`;
+  const i=times.findIndex(t=>t.startsWith(localStr));
+  if(i>=0) return i;
+  // Fallback: find closest hour
+  const nowMs=now.getTime();
+  let best=0, bestDiff=Infinity;
+  times.forEach((t,idx)=>{
+    const diff=Math.abs(new Date(t).getTime()-nowMs);
+    if(diff<bestDiff){bestDiff=diff;best=idx;}
+  });
+  return best;
+}
 function deg2card(d){return['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16];}
 function fmtT(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
 function shortT(s){const h=parseInt(s.slice(11,13)),m=s.slice(14,16),ap=h>=12?'PM':'AM',h12=h%12||12;return `${h12}:${m} ${ap}`;}
