@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SailorWatch">
+<meta name="theme-color" content="#08111f">
+<title>SailorWatch Companion</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#08111f;--bg2:#0f1d2e;--bg3:#162437;--border:#1e3048;
+  --accent:#3b82f6;--cyan:#06b6d4;--green:#10b981;--orange:#f59e0b;
+  --red:#ef4444;--text:#e2e8f0;--muted:#5a7a9a;--card:#0e1a2a;
+  --max:720px;--gap:14px;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-y:auto;}
+
+/* ── HEADER ── */
+header{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.header-inner{
+  max-width:var(--max);margin:0 auto;
+  padding:12px 16px 10px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;
+}
+.brand{font-family:'Space Mono',monospace;font-size:14px;letter-spacing:2px;color:var(--cyan);white-space:nowrap;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-row{display:flex;align-items:center;gap:6px;}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+.sdot.warn{background:var(--orange);} .sdot.err{background:var(--red);}
+.stext{font-size:11px;color:var(--muted);}
+.sync-btn{
+  display:flex;align-items:center;gap:6px;
+  background:var(--accent);color:#fff;border:none;border-radius:20px;
+  padding:7px 16px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;
+  cursor:pointer;white-space:nowrap;transition:opacity.15s;
+}
+.sync-btn:active{opacity:.7;}
+.spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none;}
+.spinner.on{display:block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── MAIN ── */
+main{max-width:var(--max);margin:0 auto;padding:var(--gap);display:flex;flex-direction:column;gap:var(--gap);}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.card-head{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);}
+.badge{font-size:10px;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--cyan);font-family:'Space Mono',monospace;}
+.card-body{padding:14px 16px;}
+
+/* ── LOCATION ── */
+.loc-bar{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px;}
+.loc-pin{font-size:20px;flex-shrink:0;}
+.loc-name{font-size:15px;font-weight:500;}
+.loc-coord{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;margin-top:2px;}
+.search-wrap{position:relative;}
+.search-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 46px 11px 14px;color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color.2s;}
+.search-input:focus{border-color:var(--accent);}
+.search-input::placeholder{color:var(--muted);}
+.search-go{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:32px;height:32px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sugs{margin-top:6px;display:none;flex-direction:column;gap:4px;}
+.sugs.on{display:flex;}
+.sug{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 13px;cursor:pointer;font-size:14px;transition:background.15s;}
+.sug:hover{background:var(--bg2);}
+.sug-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+.msg{border-radius:8px;padding:10px 13px;font-size:12px;margin-top:8px;display:none;}
+.msg.on{display:block;}
+.msg-err{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#fca5a5;}
+.msg-ok{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#6ee7b7;}
+
+/* ── DATA GRID — responsive ── */
+.grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+.ditem{background:var(--bg3);border-radius:10px;padding:11px 13px;border:1px solid var(--border);}
+.dlabel{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+.dval{font-size:22px;font-weight:600;font-family:'Space Mono',monospace;line-height:1.1;}
+.dsub{font-size:11px;color:var(--muted);margin-top:3px;}
+.c-green .dval{color:var(--green);}
+.c-cyan  .dval{color:var(--cyan);}
+.c-orange.dval,.c-orange .dval{color:var(--orange);}
+.c-red   .dval{color:var(--red);}
+
+/* ── 8-HOUR CHARTS ── */
+.chart-row{display:grid;gap:var(--gap);grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}
+.chart-box{background:var(--bg3);border-radius:10px;padding:12px;border:1px solid var(--border);}
+.chart-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.bars{display:flex;align-items:flex-end;gap:4px;height:56px;}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.bar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height.4s ease;}
+.bar-green{background:linear-gradient(to top,#10b981,#34d399);}
+.bar-blue {background:linear-gradient(to top,#1e88e5,#60a5fa);}
+.bar-red  {background:linear-gradient(to top,#ef4444,#f87171);}
+.bar-val{font-size:8px;color:var(--text);font-family:'Space Mono',monospace;line-height:1;}
+.bar-time{font-size:8px;color:var(--muted);font-family:'Space Mono',monospace;margin-top:3px;}
+
+/* ── SETTINGS ── */
+.settings-grid{display:grid;gap:var(--gap);grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}
+.srow{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px;}
+.srow:last-child{border-bottom:none;}
+.slabel{font-size:14px;}
+.ssub{font-size:11px;color:var(--muted);margin-top:2px;}
+.tgroup{display:flex;background:var(--bg3);border-radius:8px;padding:3px;gap:2px;flex-shrink:0;}
+.topt{padding:5px 11px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;transition:all.15s;}
+.topt.on{background:var(--accent);color:#fff;}
+
+/* ── SCHEDULE ── */
+.schedule-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}
+.irow{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;}
+.ilabel{font-size:13px;}
+.ibadge{font-size:10px;font-family:'Space Mono',monospace;color:var(--cyan);background:var(--bg2);padding:3px 8px;border-radius:12px;}
+
+/* ── FOOTER ── */
+.footer{text-align:center;font-size:11px;color:var(--muted);padding:16px;border-top:1px solid var(--border);max-width:var(--max);margin:0 auto;width:100%;}
+
+/* ── SECTION HEADERS ── */
+.section-title{font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">⚓ SAILORWATCH</div>
+    <div class="header-right">
+      <div class="status-row">
+        <div class="sdot" id="sdot"></div>
+        <div class="stext" id="stext">Ready</div>
+      </div>
+      <button class="sync-btn" onclick="syncNow()">
+        <div class="spinner" id="sp"></div>
+        <span id="syncLabel">Sync</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- LOCATION -->
+  <div>
+    <div class="section-title">Location</div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Current GPS Position</div>
+        <div class="badge" id="locBadge">GPS</div>
+      </div>
+      <div class="card-body">
+        <div class="loc-bar">
+          <div class="loc-pin">📍</div>
+          <div>
+            <div class="loc-name" id="locName">Deltaville, VA</div>
+            <div class="loc-coord" id="locCoord">37.5549° N · 76.3369° W</div>
+          </div>
+        </div>
+        <div class="search-wrap">
+          <input class="search-input" id="searchQ" type="text"
+                 placeholder="Search city, town, or ZIP code…"
+                 oninput="onType(this.value)"
+                 onkeydown="if(event.key==='Enter')doSearch()">
+          <button class="search-go" onclick="doSearch()">→</button>
+        </div>
+        <div class="sugs" id="sugs"></div>
+        <div class="msg msg-err" id="errMsg"></div>
+        <div class="msg msg-ok"  id="okMsg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CURRENT CONDITIONS -->
+  <div>
+    <div class="section-title">Current Conditions <span id="wBadge" style="font-weight:400;color:var(--cyan);font-family:'Space Mono',monospace;"></span></div>
+    <div class="grid">
+      <div class="ditem c-orange">
+        <div class="dlabel">Sunrise</div>
+        <div class="dval" id="dSunrise">--:--</div>
+        <div class="dsub">local time</div>
+      </div>
+      <div class="ditem c-orange">
+        <div class="dlabel">Sunset</div>
+        <div class="dval" id="dSunset">--:--</div>
+        <div class="dsub">local time</div>
+      </div>
+      <div class="ditem c-green">
+        <div class="dlabel">Wind Now</div>
+        <div class="dval" id="dWind">--</div>
+        <div class="dsub" id="dWindDir">-- direction</div>
+      </div>
+      <div class="ditem c-red">
+        <div class="dlabel">Temperature</div>
+        <div class="dval" id="dTemp">--°</div>
+        <div class="dsub" id="dTempHL">Hi -- · Lo --</div>
+      </div>
+      <div class="ditem c-cyan">
+        <div class="dlabel">High Tide</div>
+        <div class="dval" id="dTideHi">--:--</div>
+        <div class="dsub" id="dTideHiSub">finding station…</div>
+      </div>
+      <div class="ditem c-cyan">
+        <div class="dlabel">Low Tide</div>
+        <div class="dval" id="dTideLo">--:--</div>
+        <div class="dsub" id="dTideLoSub">finding station…</div>
+      </div>
+      <div class="ditem">
+        <div class="dlabel">Rain Chance</div>
+        <div class="dval" id="dRain">--%</div>
+        <div class="dsub">this hour</div>
+      </div>
+      <div class="ditem">
+        <div class="dlabel">Humidity</div>
+        <div class="dval" id="dHum">--%</div>
+        <div class="dsub">relative</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8-HOUR FORECAST CHARTS -->
+  <div>
+    <div class="section-title">8-Hour Forecast</div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="chart-label">💨 Wind</div>
+        <div class="bars" id="windBars"></div>
+        <div style="display:flex;gap:4px;margin-top:4px;" id="windTimes"></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-label">🌡 Temperature</div>
+        <div class="bars" id="tempBars"></div>
+        <div style="display:flex;gap:4px;margin-top:4px;" id="tempTimes"></div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-label">🌧 Rain %</div>
+        <div class="bars" id="rainBars"></div>
+        <div style="display:flex;gap:4px;margin-top:4px;" id="rainTimes"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div>
+    <div class="section-title">Settings</div>
+    <div class="settings-grid">
+      <div class="card">
+        <div class="card-head"><div class="card-title">Units</div></div>
+        <div class="card-body" style="padding-top:6px;padding-bottom:6px;">
+          <div class="srow">
+            <div><div class="slabel">Temperature</div><div class="ssub">°F or °C on watch</div></div>
+            <div class="tgroup">
+              <button class="topt on" id="bF" onclick="setTemp('F')">°F</button>
+              <button class="topt"    id="bC" onclick="setTemp('C')">°C</button>
+            </div>
+          </div>
+          <div class="srow">
+            <div><div class="slabel">Wind Speed</div></div>
+            <div class="tgroup">
+              <button class="topt on" id="bMph" onclick="setWind('mph')">mph</button>
+              <button class="topt"    id="bKts" onclick="setWind('kts')">kts</button>
+              <button class="topt"    id="bKph" onclick="setWind('kph')">kph</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div class="card-title">Watch Sync</div></div>
+        <div class="card-body">
+          <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+            The watch fetches data automatically via background service every hour using its last GPS fix. Use the button below to copy the current payload for manual inspection.
+          </p>
+          <button class="sync-btn" style="width:100%;justify-content:center;border-radius:10px;padding:10px;" onclick="copyPayload()">
+            📋 Copy Watch Payload
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPDATE SCHEDULE -->
+  <div>
+    <div class="section-title">Auto-Update Schedule (Watch Background Service)</div>
+    <div class="schedule-grid">
+      <div class="irow"><div class="ilabel">🌅 Sunrise / Sunset</div><div class="ibadge">every 12 hrs</div></div>
+      <div class="irow"><div class="ilabel">🌊 Nearest tide station</div><div class="ibadge">every 6 hrs</div></div>
+      <div class="irow"><div class="ilabel">💨 Wind 8-hr forecast</div><div class="ibadge">every 1 hr</div></div>
+      <div class="irow"><div class="ilabel">🌡 Temp 8-hr forecast</div><div class="ibadge">every 1 hr</div></div>
+      <div class="irow"><div class="ilabel">🌧 Rain % 8-hr forecast</div><div class="ibadge">every 1 hr</div></div>
+      <div class="irow"><div class="ilabel">🔼🔽 Daily Hi / Lo temp</div><div class="ibadge">every 24 hrs</div></div>
+    </div>
+  </div>
+
+  <div class="footer" id="lastSync">Last synced: never</div>
+
+</main>
+
+<script>
+const S={lat:37.5549,lon:-76.3369,city:'Deltaville, VA',tempUnit:'F',windUnit:'mph',winds8:[],temps8:[],rain8:[],lastSync:null,payload:null};
+try{const s=localStorage.getItem('sw3');if(s)Object.assign(S,JSON.parse(s));}catch(e){}
+function save(){try{localStorage.setItem('sw3',JSON.stringify(S));}catch(e){}}
+
+// ── LOCATION ──
+let st=null;
+function onType(v){clearTimeout(st);if(v.length<3){hideSugs();return;}st=setTimeout(()=>suggest(v),400);}
+async function suggest(q){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&addressdetails=1`,
+      {headers:{'Accept-Language':'en','User-Agent':'SailorWatchApp/1.0'}});
+    const js=await r.json();showSugs(js);
+  }catch(e){hideSugs();}
+}
+function showSugs(res){
+  const el=document.getElementById('sugs');
+  if(!res.length){hideSugs();return;}
+  el.innerHTML=res.map(r=>{
+    const name=r.display_name.split(',').slice(0,3).join(', ');
+    const coord=`${parseFloat(r.lat).toFixed(4)}° · ${parseFloat(r.lon).toFixed(4)}°`;
+    return `<div class="sug" onclick="pickLoc(${r.lat},${r.lon},'${name.replace(/'/g,"\\'")}')">
+      <div>${name}</div><div class="sug-sub">${coord}</div></div>`;
+  }).join('');
+  el.classList.add('on');
+}
+function hideSugs(){document.getElementById('sugs').classList.remove('on');}
+function doSearch(){const q=document.getElementById('searchQ').value.trim();if(q)suggest(q);}
+function pickLoc(lat,lon,name){
+  S.lat=parseFloat(lat);S.lon=parseFloat(lon);S.city=name;
+  document.getElementById('searchQ').value='';
+  hideSugs();updateLocUI();ok('Location updated — fetching data…');save();fetchAll();
+}
+function updateLocUI(){
+  document.getElementById('locName').textContent=S.city;
+  const lD=S.lat>=0?'N':'S',oD=S.lon>=0?'E':'W';
+  document.getElementById('locCoord').textContent=
+    `${Math.abs(S.lat).toFixed(4)}° ${lD} · ${Math.abs(S.lon).toFixed(4)}° ${oD}`;
+}
+
+// ── FETCH ──
+async function fetchAll(){
+  setStatus('Fetching…','warn');
+  try{
+    await Promise.all([fetchWeather(),fetchSunTide()]);
+    S.lastSync=Date.now();save();
+    setStatus('Up to date','ok');
+    document.getElementById('lastSync').textContent='Last synced '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('wBadge').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    renderCharts();
+  }catch(e){setStatus('Fetch failed','err');err('Could not load: '+e.message);}
+}
+
+async function fetchWeather(){
+  const tu=S.tempUnit==='C'?'celsius':'fahrenheit';
+  const wu=S.windUnit==='kph'?'kmh':S.windUnit==='kts'?'kn':'mph';
+  const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${S.lat}&longitude=${S.lon}`+
+    `&hourly=temperature_2m,windspeed_10m,winddirection_10m,precipitation_probability,relativehumidity_2m`+
+    `&daily=temperature_2m_max,temperature_2m_min&current_weather=true`+
+    `&temperature_unit=${tu}&windspeed_unit=${wu}&timezone=${encodeURIComponent(tz)}&forecast_days=2`;
+  const r=await fetch(url);const d=await r.json();
+  const hIdx=findHour(d.hourly.time,new Date());
+  S.winds8=arr8(d.hourly.windspeed_10m,hIdx);
+  S.rawWinds8=arr8(d.hourly.windspeed_10m,hIdx); // store in API units
+  S.temps8=arr8(d.hourly.temperature_2m,hIdx);
+  S.rain8 =arr8(d.hourly.precipitation_probability,hIdx);
+  const cw=d.current_weather;
+  const tNow=Math.round(d.hourly.temperature_2m[hIdx]);
+  const tHi=Math.round(d.daily.temperature_2m_max[0]);
+  const tLo=Math.round(d.daily.temperature_2m_min[0]);
+  const rain=d.hourly.precipitation_probability[hIdx]||0;
+  const hum=d.hourly.relativehumidity_2m[hIdx]||0;
+  const windConv=S.windUnit==='kts'?0.868976:S.windUnit==='kph'?1.60934:1;
+  const dispWind=Math.round(cw.windspeed*windConv);
+  document.getElementById('dWind').textContent=dispWind;
+  document.getElementById('dWindDir').textContent=deg2card(cw.winddirection)+' · '+S.windUnit;
+  document.getElementById('dTemp').textContent=`${tNow}°${S.tempUnit}`;
+  document.getElementById('dTempHL').textContent=`Hi ${tHi}° · Lo ${tLo}°`;
+  document.getElementById('dRain').textContent=`${rain}%`;
+  document.getElementById('dHum').textContent=`${hum}%`;
+  S.payload={windSpeed:Math.round(cw.windspeed),windDir:deg2card(cw.winddirection),
+    tempCur:tNow,tempHi:tHi,tempLo:tLo,winds:S.winds8,temps:S.temps8,rain:S.rain8,
+    lat:S.lat,lon:S.lon,tempUnit:S.tempUnit,windUnit:S.windUnit,cityName:S.city};
+}
+
+async function fetchSunTide(){
+  try{
+    const r=await fetch(`https://api.sunrise-sunset.org/json?lat=${S.lat}&lng=${S.lon}&formatted=0`);
+    const d=await r.json();
+    if(d.status==='OK'){
+      const sr=fmtT(new Date(d.results.sunrise));
+      const ss=fmtT(new Date(d.results.sunset));
+      document.getElementById('dSunrise').textContent=sr;
+      document.getElementById('dSunset').textContent=ss;
+      if(S.payload){S.payload.sunrise=sr;S.payload.sunset=ss;}
+    }
+  }catch(e){}
+  try{
+    const stId=nearestStation(S.lat,S.lon);
+    if(stId){
+      const today=todayStr();
+      const r=await fetch(`https://api.tidesandcurrents.noaa.gov/api/prod/datagetter`+
+        `?begin_date=${today}&end_date=${today}&station=${stId}`+
+        `&product=predictions&datum=MLLW&time_zone=lst_ldt&interval=hilo&units=english&format=json`);
+      const d=await r.json();
+      if(d.predictions){
+        let hi='--:--',lo='--:--';
+        d.predictions.forEach(p=>{if(p.type==='H'&&hi==='--:--')hi=shortT(p.t);if(p.type==='L'&&lo==='--:--')lo=shortT(p.t);});
+        document.getElementById('dTideHi').textContent=hi;
+        document.getElementById('dTideLo').textContent=lo;
+        document.getElementById('dTideHiSub').textContent='NOAA #'+stId;
+        document.getElementById('dTideLoSub').textContent='NOAA #'+stId;
+        if(S.payload){S.payload.tideHi=hi;S.payload.tideLo=lo;}
+      }
+    }else{
+      document.getElementById('dTideHi').textContent='N/A';
+      document.getElementById('dTideLo').textContent='N/A';
+      document.getElementById('dTideHiSub').textContent='inland location';
+      document.getElementById('dTideLoSub').textContent='no coastal station';
+    }
+  }catch(e){}
+}
+
+// ── CHARTS ──
+function renderCharts(){
+  renderBar('windBars','windTimes',convertWinds(S.winds8),'bar-green',S.windUnit);
+  renderBar('tempBars','tempTimes',S.temps8,'bar-red','°'+S.tempUnit);
+  renderBar('rainBars','rainTimes',S.rain8,'bar-blue','%');
+}
+function convertWinds(arr){
+  const conv=S.windUnit==='kts'?0.868976:S.windUnit==='kph'?1.60934:1;
+  return arr.map(v=>Math.round(v*conv));
+}
+function renderBar(bId,tId,data,cls,unit){
+  const max=Math.max(...data,1);
+  const now=new Date();const h=now.getHours();
+  document.getElementById(bId).innerHTML=data.map((v,i)=>`
+    <div class="bar-col">
+      <div class="bar-val">${Math.round(v)}</div>
+      <div class="bar ${cls}" style="height:${Math.max(Math.round(v/max*52),3)}px;width:100%"></div>
+    </div>`).join('');
+  document.getElementById(tId).innerHTML=data.map((_,i)=>{
+    const hh=(h+i)%24,ap=hh>=12?'p':'a',h12=hh%12||12;
+    return `<div style="flex:1;text-align:center;font-size:8px;color:var(--muted);font-family:'Space Mono',monospace">${h12}${ap}</div>`;
+  }).join('');
+}
+
+// ── SETTINGS ──
+function setTemp(u){S.tempUnit=u;['F','C'].forEach(x=>document.getElementById('b'+x).classList.toggle('on',x===u));save();fetchAll();}
+function setWind(u){
+  S.windUnit=u;
+  ['Mph','Kts','Kph'].forEach(x=>document.getElementById('b'+x).classList.toggle('on',x.toLowerCase()===u));
+  // Persist pref so watch background service picks it up
+  localStorage.setItem('prefWindUnit', u);
+  // Reconvert any displayed wind value without refetching if we have cached data
+  if(S.winds8.length){
+    const conv=u==='kts'?0.868976:u==='kph'?1.60934:1;
+    const convVal=v=>Math.round(v*conv);
+    document.getElementById('dWind').textContent=convVal(S.rawWindMps||parseInt(document.getElementById('dWind').textContent));
+    document.getElementById('dWindDir').textContent=(document.getElementById('dWindDir').textContent.split('·')[0].trim())+' · '+u;
+    renderCharts();
+  }
+  save(); fetchAll();
+}
+
+// ── SYNC ──
+async function syncNow(){
+  document.getElementById('sp').classList.add('on');
+  document.getElementById('syncLabel').textContent='Syncing…';
+  await fetchAll();
+  document.getElementById('sp').classList.remove('on');
+  document.getElementById('syncLabel').textContent='Sync';
+}
+function copyPayload(){
+  if(!S.payload){err('No data yet — sync first');return;}
+  navigator.clipboard.writeText(JSON.stringify(S.payload,null,2)).then(()=>ok('Payload copied to clipboard'));
+}
+
+// ── HELPERS ──
+function arr8(arr,start){return Array.from({length:8},(_,i)=>Math.round(arr[start+i]||0));}
+function findHour(times,now){const h=now.toISOString().slice(0,13);const i=times.findIndex(t=>t.startsWith(h));return i>=0?i:0;}
+function deg2card(d){return['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'][Math.round(d/22.5)%16];}
+function fmtT(d){return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function shortT(s){const h=parseInt(s.slice(11,13)),m=s.slice(14,16),ap=h>=12?'PM':'AM',h12=h%12||12;return `${h12}:${m} ${ap}`;}
+function todayStr(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');}
+function nearestStation(lat,lon){
+  const st=[['8635750',37.5567,-76.33],['8638610',36.9467,-76.33],['8632200',37.605,-75.96],
+    ['8651370',35.7167,-75.55],['8665530',32.7817,-79.925],['8720218',30.4,-81.6],
+    ['8447930',41.5233,-70.6717],['8443970',42.3583,-71.05],['8518750',40.6967,-74.0133],
+    ['8771341',29.73,-95.2667],['9414290',37.8067,-122.465],['9410170',32.715,-117.173]];
+  let best=null,bd=999;
+  st.forEach(s=>{const d=Math.sqrt((lat-s[1])**2+(lon-s[2])**2);if(d<bd){bd=d;best=s[0];}});
+  return bd<1.5?best:null;
+}
+function setStatus(msg,state){
+  document.getElementById('stext').textContent=msg;
+  document.getElementById('sdot').className='sdot'+(state==='warn'?' warn':state==='err'?' err':'');
+}
+function err(m){const e=document.getElementById('errMsg');e.textContent=m;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),4000);}
+function ok(m){const e=document.getElementById('okMsg');e.textContent=m;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),4000);}
+
+// ── INIT ──
+updateLocUI();
+if(S.tempUnit==='C')setTemp('C');
+if(S.windUnit!=='mph')setWind(S.windUnit);
+fetchAll();
+</script>
+</body>
+</html>
