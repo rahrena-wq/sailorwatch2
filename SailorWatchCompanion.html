@@ -300,6 +300,58 @@ main{max-width:var(--max);margin:0 auto;padding:var(--gap);display:flex;flex-dir
 </main>
 
 <script>
+
+// ── GIST CONFIG ──
+// Replace YOUR_TOKEN_HERE with your GitHub personal access token (gist scope only)
+const GITHUB_TOKEN = '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';
+const GIST_ID      = '3cac51cf9682f10785d911c5f212c7fc';
+const GIST_FILE    = 'sailorwatch_location.json';
+
+async function pushToGist(lat, lon, city) {
+  if (!GITHUB_TOKEN || GITHUB_TOKEN === 'YOUR_TOKEN_HERE') {
+    ok('Location saved locally. Add your GitHub token to sync to watch.');
+    return;
+  }
+  try {
+    const payload = { lat, lon, city, source:'companion', ts:Date.now() };
+    const r = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        files: { [GIST_FILE]: { content: JSON.stringify(payload, null, 2) } }
+      })
+    });
+    if (r.ok) {
+      ok('✓ Location synced to watch — updates within the hour');
+    } else {
+      err('Gist sync failed: ' + r.status + ' — check your token');
+    }
+  } catch(e) {
+    err('Gist sync failed: ' + e.message);
+  }
+}
+
+async function pullFromGist() {
+  try {
+    const r = await fetch(
+      `https://api.github.com/gists/${GIST_ID}`,
+      { headers: { 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (!r.ok) return;
+    const d = await r.json();
+    const raw = d.files[GIST_FILE] && d.files[GIST_FILE].content;
+    if (!raw) return;
+    const loc = JSON.parse(raw);
+    if (loc && loc.lat && loc.lon && loc.source === 'companion') {
+      S.lat = loc.lat; S.lon = loc.lon; S.city = loc.city || S.city;
+      updateLocUI(); save();
+    }
+  } catch(e) {}
+}
+
 const S={lat:37.5549,lon:-76.3369,city:'Deltaville, VA',tempUnit:'F',windUnit:'mph',winds8:[],temps8:[],rain8:[],lastSync:null,payload:null};
 try{const s=localStorage.getItem('sw3');if(s)Object.assign(S,JSON.parse(s));}catch(e){}
 function save(){try{localStorage.setItem('sw3',JSON.stringify(S));}catch(e){}}
@@ -502,7 +554,7 @@ function err(m){const e=document.getElementById('errMsg');e.textContent=m;e.clas
 function ok(m){const e=document.getElementById('okMsg');e.textContent=m;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),4000);}
 
 // ── INIT ──
-updateLocUI();
+pullFromGist().then(()=>{ updateLocUI(); });
 if(S.tempUnit==='C')setTemp('C');
 if(S.windUnit!=='mph')setWind(S.windUnit);
 fetchAll();
